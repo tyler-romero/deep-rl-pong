@@ -1,5 +1,6 @@
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
+from tensorflow.python.ops import variable_scope as vs
 
 from utils.general import get_logger
 from utils.test_env import EnvTest
@@ -40,12 +41,12 @@ class Linear(DQN):
                          shape = (batch_size, img height, img width, nchannels x config.state_history)
                - self.done_mask: batch of done, type = bool
                          shape = (batch_size)
-                         note that this placeholder contains bool = True only if we are done in 
+                         note that this placeholder contains bool = True only if we are done in
                          the relevant transition
                - self.lr: learning rate, type = float32
-        
+
         (Don't change the variable names!)
-        
+
         HINT: variables from config are accessible with self.config.variable_name
               Also, you may want to use a dynamic dimension for the batch dimension.
               Check the use of None for tensorflow placeholders.
@@ -54,9 +55,16 @@ class Linear(DQN):
         """
         ##############################################################
         ################YOUR CODE HERE (6-15 lines) ##################
+        img_height = state_shape[0]
+        img_width = state_shape[1]
+        nchannels = state_shape[2]
 
-        pass
-
+        self.s = tf.placeholder(tf.uint8, (None, img_height, img_width, nchannels * config.state_history), name="states")
+        self.a = tf.placeholder(tf.int32, (None), name="actions")
+        self.r = tf.placeholder(tf.float32, (None), name="rewards")
+        self.sp = tf.placeholder(tf.uint8, (None, img_height, img_width, nchannels * config.state_history), name="next_states")
+        self.done_mask = tf.placeholder(tf.bool, (None), name="done_mask")
+        self.lr = tf.placeholder(tf.float32, (), name="lr")
         ##############################################################
         ######################## END YOUR CODE #######################
 
@@ -66,7 +74,7 @@ class Linear(DQN):
         Returns Q values for all actions
 
         Args:
-            state: (tf tensor) 
+            state: (tf tensor)
                 shape = (batch_size, img height, img width, nchannels)
             scope: (string) scope name, that specifies if target network or not
             reuse: (bool) reuse of variables in the scope
@@ -82,7 +90,7 @@ class Linear(DQN):
         """
         TODO: implement a fully connected with no hidden layer (linear
             approximation) using tensorflow. In other words, if your state s
-            has a flattened shape of n, and you have m actions, the result of 
+            has a flattened shape of n, and you have m actions, the result of
             your computation sould be equal to
                 W s where W is a matrix of shape m x n
 
@@ -94,10 +102,14 @@ class Linear(DQN):
               lasagne, cafe, etc.)
         """
         ##############################################################
-        ################ YOUR CODE HERE - 2-3 lines ################## 
-        
-        pass
-
+        ################ YOUR CODE HERE - 2-3 lines ##################
+        out = layers.fully_connected(
+                        inputs = state,
+                        num_outputs = num_actions,
+                        activation_fn = None,
+                        reuse = reuse,
+                        trainable = True,
+                        scope = scope)
         ##############################################################
         ######################## END YOUR CODE #######################
 
@@ -106,7 +118,7 @@ class Linear(DQN):
 
     def add_update_target_op(self, q_scope, target_q_scope):
         """
-        update_target_op will be called periodically 
+        update_target_op will be called periodically
         to copy Q network weights to target Q network
 
         Remember that in DQN, we maintain two identical Q networks with
@@ -116,12 +128,12 @@ class Linear(DQN):
         in tensorflow, read the docs
         https://www.tensorflow.org/programmers_guide/variable_scope
 
-        Periodically, we need to update all the weights of the Q network 
+        Periodically, we need to update all the weights of the Q network
         and assign them with the values from the regular network. Thus,
-        what we need to do is to build a tf op, that, when called, will 
-        assign all variables in the target network scope with the values of 
+        what we need to do is to build a tf op, that, when called, will
+        assign all variables in the target network scope with the values of
         the corresponding variables of the regular network scope.
-    
+
         Args:
             q_scope: (string) name of the scope of variables for q
             target_q_scope: (string) name of the scope of variables
@@ -130,7 +142,7 @@ class Linear(DQN):
         ##############################################################
         """
         TODO: add an operator self.update_target_op that assigns variables
-            from target_q_scope with the values of the corresponding var 
+            from target_q_scope with the values of the corresponding var
             in q_scope
 
         HINT: you may find the following functions useful:
@@ -142,9 +154,12 @@ class Linear(DQN):
         """
         ##############################################################
         ################### YOUR CODE HERE - 5-10 lines #############
-        
-        pass
+        q = tf.get_collection(tf.all_variables(), scope = q_scope)
+        target_q = tf.get_collection(tf.all_variables(), scope = target_q_scope)
 
+        # How to use tf.group?
+
+        self.update_target_op = tf.assign(target_q, q)
         ##############################################################
         ######################## END YOUR CODE #######################
 
@@ -165,7 +180,7 @@ class Linear(DQN):
         TODO: The loss for an example is defined as:
                 Q_samp(s) = r if done
                           = r + gamma * max_a' Q_target(s', a')
-                loss = (Q_samp(s) - Q(s, a))^2 
+                loss = (Q_samp(s) - Q(s, a))^2
 
               You need to compute the average of the loss over the minibatch
               and store the resulting scalar into self.loss
@@ -183,8 +198,11 @@ class Linear(DQN):
         """
         ##############################################################
         ##################### YOUR CODE HERE - 4-5 lines #############
-
-        pass
+        with vs.variable_scope("loss"):
+            q_samp = tf.cond(self.done_mask, self.r, self.r + self.config.gamma * tf.reduce_max(target_q, axis = 1))    # Check s vs s' compatibility
+            q_s_a = tf.reduce_sum(tf.multiply(tf.one_hot(self.a), q), axis = 1)
+            loss_vector = tf.pow(q_samp - q_s_a, 2)
+            self.loss = tf.reduce_mean(loss_vector)
 
         ##############################################################
         ######################## END YOUR CODE #######################
@@ -213,26 +231,35 @@ class Linear(DQN):
             - tf.clip_by_norm
             - optimizer.apply_gradients
             - tf.global_norm
-             
+
              you can access config variable by writing self.config.variable_name
 
         (be sure that you set self.train_op and self.grad_norm)
         """
         ##############################################################
         #################### YOUR CODE HERE - 8-12 lines #############
+        optimizer = tf.train.AdamOptimizer(self.lr)
 
-        pass
-        
+        grads_and_vars = optimizer.compute_gradients(self.loss, tf.trainable_variables())
+
+        if self.config.grad_clip is True:
+            variables = [v for g, v in grads_and_vars]
+            clipped_grads = [tf.clip_by_norm(g, self.config.clip_val) for g, v in grads_and_vars]
+            grads_and_vars = zip(clipped_grads, variables)
+
+        self.grad_norm = tf.global_norm(tf.trainable_variables(), name = "global_norm")
+        self.train_op = optimizer.apply_gradients(grads_and_vars, name = "apply_clipped_grads")
+
         ##############################################################
         ######################## END YOUR CODE #######################
-    
+
 
 
 if __name__ == '__main__':
     env = EnvTest((5, 5, 1))
 
     # exploration strategy
-    exp_schedule = LinearExploration(env, config.eps_begin, 
+    exp_schedule = LinearExploration(env, config.eps_begin,
             config.eps_end, config.eps_nsteps)
 
     # learning rate schedule

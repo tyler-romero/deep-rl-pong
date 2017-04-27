@@ -1,4 +1,5 @@
 import numpy as np
+import random
 from utils.test_env import EnvTest
 
 
@@ -25,7 +26,7 @@ class LinearSchedule(object):
         """
         ##############################################################
         """
-        TODO: modify self.epsilon such that 
+        TODO: modify self.epsilon such that
                for t = 0, self.epsilon = self.eps_begin
                for t = self.nsteps, self.epsilon = self.eps_end
                linear decay between the two
@@ -33,9 +34,12 @@ class LinearSchedule(object):
               self.epsilon should never go under self.eps_end
         """
         ##############################################################
-        ################ YOUR CODE HERE - 3-4 lines ################## 
-
-        pass
+        ################ YOUR CODE HERE - 3-4 lines ##################
+        if(t >= self.nsteps):
+            self.epsilon = self.eps_end
+        else:
+            slope = (self.eps_end - self.eps_begin)/float(self.nsteps)
+            self.epsilon = self.eps_begin + t*slope
 
         ##############################################################
         ######################## END YOUR CODE ############## ########
@@ -73,9 +77,9 @@ class LinearExploration(LinearSchedule):
         """
         ##############################################################
         ################ YOUR CODE HERE - 4-5 lines ##################
-
-        pass
-
+        if(random.random() > self.epsilon):
+            return best_action
+        return self.env.action_space.sample()
         ##############################################################
         ######################## END YOUR CODE ############## ########
 
@@ -84,7 +88,7 @@ class LinearExploration(LinearSchedule):
 def test1():
     env = EnvTest((5, 5, 1))
     exp_strat = LinearExploration(env, 1, 0, 10)
-    
+
     found_diff = False
     for i in range(10):
         rnd_act = exp_strat.get_action(0)
