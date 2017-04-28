@@ -103,12 +103,14 @@ class Linear(DQN):
         """
         ##############################################################
         ################ YOUR CODE HERE - 2-3 lines ##################
+        init = layers.xavier_initializer()
+        flat_state = layers.flatten(state, scope = scope)
         out = layers.fully_connected(
-                        inputs = state,
+                        inputs = flat_state,
                         num_outputs = num_actions,
                         activation_fn = None,
+                        weights_initializer = init,
                         reuse = reuse,
-                        trainable = True,
                         scope = scope)
         ##############################################################
         ######################## END YOUR CODE #######################
@@ -154,12 +156,12 @@ class Linear(DQN):
         """
         ##############################################################
         ################### YOUR CODE HERE - 5-10 lines #############
-        q = tf.get_collection(tf.all_variables(), scope = q_scope)
-        target_q = tf.get_collection(tf.all_variables(), scope = target_q_scope)
+        q = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope = q_scope)
+        target_q = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope = target_q_scope)
 
         # How to use tf.group?
-
-        self.update_target_op = tf.assign(target_q, q)
+        assignment_list = [tf.assign(target_q_var, q_var) for target_q_var, q_var in zip(target_q, q)]
+        self.update_target_op = tf.group(*assignment_list)
         ##############################################################
         ######################## END YOUR CODE #######################
 
@@ -199,9 +201,10 @@ class Linear(DQN):
         ##############################################################
         ##################### YOUR CODE HERE - 4-5 lines #############
         with vs.variable_scope("loss"):
-            q_samp = tf.cond(self.done_mask, self.r, self.r + self.config.gamma * tf.reduce_max(target_q, axis = 1))    # Check s vs s' compatibility
-            q_s_a = tf.reduce_sum(tf.multiply(tf.one_hot(self.a), q), axis = 1)
-            loss_vector = tf.pow(q_samp - q_s_a, 2)
+            mask = -tf.cast(self.done_mask, tf.float32)+1
+            q_samp = self.r + mask * (self.config.gamma * tf.reduce_max(target_q, axis = 1))
+            q_s_a = tf.reduce_sum(tf.multiply(tf.one_hot(self.a, depth = num_actions), q), axis = 1)
+            loss_vector = tf.square(q_samp - q_s_a)
             self.loss = tf.reduce_mean(loss_vector)
 
         ##############################################################
