@@ -200,12 +200,11 @@ class Linear(DQN):
         """
         ##############################################################
         ##################### YOUR CODE HERE - 4-5 lines #############
-        with vs.variable_scope("loss"):
-            mask = -tf.cast(self.done_mask, tf.float32)+1
-            q_samp = self.r + mask * (self.config.gamma * tf.reduce_max(target_q, axis = 1))
-            q_s_a = tf.reduce_sum(tf.multiply(tf.one_hot(self.a, depth = num_actions), q), axis = 1)
-            loss_vector = tf.square(q_samp - q_s_a)
-            self.loss = tf.reduce_mean(loss_vector)
+        mask = -tf.cast(self.done_mask, tf.float32)+1
+        q_samp = self.r + mask * (self.config.gamma * tf.reduce_max(target_q, axis = 1))
+        q_s_a = tf.reduce_sum(tf.multiply(tf.one_hot(self.a, depth = num_actions), q), axis = 1)
+        loss_vector = tf.square(q_samp - q_s_a)
+        self.loss = tf.reduce_mean(loss_vector)
 
         ##############################################################
         ######################## END YOUR CODE #######################
