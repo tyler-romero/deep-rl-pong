@@ -52,15 +52,13 @@ class NatureQN(Linear):
         """
         ##############################################################
         ################ YOUR CODE HERE - 10-15 lines ################
-        # Add biases
-        #binit = tf.zeros
-        #with tf.variable_scope(scope):
-        conv1 = layers.conv2d(state, num_outputs = 32, kernel_size = [8,8], stride = [4,4], padding = "same", activation_fn=tf.nn.relu, scope = scope+'1')
-        conv2 = layers.conv2d(conv1, num_outputs = 64, kernel_size = [4,4], stride = [2,2], padding = "same", activation_fn=tf.nn.relu, scope = scope+'2')
-        conv3 = layers.conv2d(conv2, num_outputs = 64, kernel_size = [3,3], stride = [1,1], padding = "same", activation_fn=tf.nn.relu, scope = scope+'3')
-        flat_conv3 = layers.flatten(conv3, scope = scope+'4')
-        fc1 = layers.fully_connected(inputs = tf.to_float(flat_conv3), num_outputs = 512, scope = scope+'5')
-        out = layers.fully_connected(inputs = fc1, num_outputs = num_actions, activation_fn = None, scope = scope)
+        with tf.variable_scope(scope, reuse = reuse):
+            conv1 = layers.conv2d(state, num_outputs = 32, kernel_size = [8,8], stride = [4,4], padding = "same", activation_fn=tf.nn.relu)
+            conv2 = layers.conv2d(conv1, num_outputs = 64, kernel_size = [4,4], stride = [2,2], padding = "same", activation_fn=tf.nn.relu)
+            conv3 = layers.conv2d(conv2, num_outputs = 64, kernel_size = [3,3], stride = [1,1], padding = "same", activation_fn=tf.nn.relu)
+            flat_conv3 = layers.flatten(conv3)
+            fc1 = layers.fully_connected(inputs = flat_conv3, num_outputs = 512, activation_fn=tf.nn.relu)
+            out = layers.fully_connected(inputs = fc1, num_outputs = num_actions, activation_fn = None)
         ##############################################################
         ######################## END YOUR CODE #######################
         return out
